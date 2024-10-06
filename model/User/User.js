@@ -41,7 +41,7 @@ const userSchema = new mongoose.Schema(
     }, 
     Limits :{
       type : Number ,
-      default : 20 
+      default : 0 
     },
     UserId : {
       type :mongoose.Schema.Types.ObjectId ,
