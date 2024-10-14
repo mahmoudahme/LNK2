@@ -50,6 +50,13 @@ const userSchema = new mongoose.Schema(
     UserId : {
       type :mongoose.Schema.Types.ObjectId ,
       ref : "User"
+    },
+    otp : {
+      type : Number ,
+    } ,
+    received :{
+      type : Number ,
+      default : 0
     }
   },
   { timestamps: true }
