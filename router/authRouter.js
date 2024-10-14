@@ -5,13 +5,15 @@ import {
     logout,
     sendOTP,
     verifyOTP,
-    forgetPassword} 
+    forgetPassword,
+    changePassword
+} 
 from "../controller/authController.js";
 
 import { verifyToken } from "../Utils/verifyToken.js";
 
 const router = express.Router();
-router.post('/sendOTP', sendOTP);
+router.post('/changePassword', changePassword);
 router.post('/verifyOTP', verifyOTP);
 router.post("/register", register)
 router.post("/login" , login)
