@@ -18,40 +18,16 @@ function generateOTP() {
     charset: "numeric",
   });
 }
-export const sendOTP = async (req, res) => {
-  try {
-    const { email } = req.body;
-    const otp = generateOTP(); // Generate a 6-digit OTP
-    const newOTP = new OTP({ email, otp });
-    await newOTP.save();
-
-    // Send OTP via email
-    await mailSender({
-      to: email,
-      subject: "Verification Email",
-      message: `<h1>Please confirm your OTP</h1>
-       <p>Here is your OTP code: ${otp}</p>`,
-    });
-
-    res.status(200).json({ success: true, message: "OTP sent successfully" });
-  } catch (error) {
-    console.error("Error sending OTP:", error);
-    res.status(500).json({ success: false, error: "Internal server error" });
-  }
-};
-
 export const verifyOTP = async (req, res, next) => {
   try {
     const { email, otp } = req.body;
-    const existingOTP = await OTP.findOneAndDelete({ email, otp });
-
-    if (existingOTP) {
-      // OTP is valid
+    const user = await User.findOne({ email: email });
+    if (user.otp == otp) {
+      await User.findByIdAndUpdate(user.id, { received: otp }, { new: true });
       res
         .status(200)
         .json({ success: true, message: "OTP verification successful" });
     } else {
-      // OTP is invalid
       res.status(400).json({ success: false, error: "Invalid OTP" });
     }
   } catch (error) {
@@ -59,73 +35,109 @@ export const verifyOTP = async (req, res, next) => {
     res.status(500).json({ success: false, error: "Internal server error" });
   }
 };
-
 export const register = async (req, res, next) => {
   try {
-    if (req.body.UserId == undefined) {
-      //generate new password
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(req.body.password, salt);
-      //create new user
-      if (req.body.typeofUser == "agency") {
-        const newUser = new User({
-          typeofUser: req.body.typeofUser,
-          name: req.body.name,
-          email: req.body.email,
-          phone: req.body.phone,
-          password: hashedPassword,
-          city: req.body.city,
-          address: req.body.address,
-          Limits: 20,
-        });
-        await newUser.save();
-        res
-          .status(200)
-          .json({ message: "New User Created", userdata: newUser });
-      } else {
-        const newUser = new User({
-          typeofUser: req.body.typeofUser,
-          name: req.body.name,
-          email: req.body.email,
-          phone: req.body.phone,
-          password: hashedPassword,
-          city: req.body.city,
-          address: req.body.address
-        });
-        await newUser.save();
-        res
-          .status(200)
-          .json({ message: "New User Created", userdata: newUser });
-      }
-    } else {
-      const userId = req.body.UserId;
-      const user = await User.findById(userId);
-      if (user.Limits > 0) {
+    const { name, email, phone, password, city, address } = req.body;
+    const user = await User.findOne({ phone: phone });
+    if (!user) {
+      if (req.body.UserId == undefined) {
         //generate new password
+        const otp = generateOTP();
+        await mailSender({
+          to: email,
+          subject: "Verification Email",
+          message: `<h1>Please confirm your OTP</h1>
+               <p>Here is your OTP code: ${otp}</p>`,
+        });
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(req.body.password, salt);
         //create new user
-        const newUser = new User({
-          typeofUser: req.body.typeofUser,
-          name: req.body.name,
-          email: req.body.email,
-          phone: req.body.phone,
-          password: hashedPassword,
-          city: req.body.city,
-          address: req.body.address,
+        if (req.body.typeofUser == "agency") {
+          const newUser = new User({
+            typeofUser: req.body.typeofUser,
+            name: req.body.name,
+            email: req.body.email,
+            phone: req.body.phone,
+            password: hashedPassword,
+            city: req.body.city,
+            address: req.body.address,
+            Limits: 20,
+            otp: otp,
+          });
+          await newUser.save();
+          res
+            .status(200)
+            .json({ message: "New User Created", userdata: newUser });
+        } else {
+          const newUser = new User({
+            typeofUser: req.body.typeofUser,
+            name: req.body.name,
+            email: req.body.email,
+            phone: req.body.phone,
+            password: hashedPassword,
+            city: req.body.city,
+            address: req.body.address,
+            otp : otp
+          });
+          await newUser.save();
+          res
+            .status(200)
+            .json({ message: "New User Created", userdata: newUser });
+        }
+      } else {
+        const userId = req.body.UserId;
+        const user = await User.findById(userId);
+        if (user.Limits > 0) {
+          //generate new password
+          const otp = generateOTP();
+          await mailSender({
+            to: email,
+            subject: "Verification Email",
+            message: `<h1>Please confirm your OTP</h1>
+                <p>Here is your OTP code: ${otp}</p>`,
+          });
+          const salt = await bcrypt.genSalt(10);
+          const hashedPassword = await bcrypt.hash(req.body.password, salt);
+          //create new user
+          const newUser = new User({
+            typeofUser: req.body.typeofUser,
+            name: req.body.name,
+            email: req.body.email,
+            phone: req.body.phone,
+            password: hashedPassword,
+            city: req.body.city,
+            address: req.body.address,
+            otp : otp
+          });
+          await newUser.save();
+          res
+            .status(200)
+            .json({ message: "New User Created", userdata: newUser });
+
+          await User.findByIdAndUpdate(
+            user.id,
+            { Limits: user.Limits - 1 },
+            { new: true }
+          );
+        } else {
+          res.status(300).json({ message: "You Should Upgrade your Account " });
+        }
+      }
+    }else if(user){
+      if(user.otp == user.received){
+        res.status(200).json({success : false  , message : "This Email or Phone is Used Before" })
+      }else{
+        const otp = generateOTP();
+        await mailSender({
+          to: email,
+          subject: "Verification Email",
+          message: `<h1>Please confirm your OTP</h1>
+               <p>Here is your OTP code: ${otp}</p>`,
         });
-        await newUser.save();
+        await User.findByIdAndUpdate(user.id, { otp: otp }, { new: true });
         res
           .status(200)
-          .json({ message: "New User Created", userdata: newUser });
-
-        await User.findByIdAndUpdate(
-          user.id,
-          { Limits: user.Limits - 1 },
-          { new: true }
-        );
-      } else {
-        res.status(300).json({ message: "You Should Upgrade your Account " });
+          .json({ success: true, message: "OTP sent successfully" });
       }
     }
   } catch (error) {
@@ -142,36 +154,42 @@ export const login = async (req, res, next) => {
     });
     if (!user) {
       return next(new ApiError("User not found!", 404));
+    }else{
+      if(user.otp == user.received){
+        const isPasswordCorrect = await bcrypt.compare(
+          req.body.password,
+          user.password
+        );
+        if (!isPasswordCorrect) {
+          return next(new ApiError("password isn't correct", 422));
+        }
+        if (user.approve) {
+          const token = JsonWebToken.sign(
+            { id: user._id, isAdmin: user.isAdmin },
+            process.env.JWT
+          );
+          const { password, isAdmin, ...otherDetails } = user._doc;
+          logger.info("User LogIn");
+          res
+            .cookie("accessToken", token, {
+              httpOnly: true,
+              sameSite: "lax",
+            })
+            .status(200)
+            .json({ details: { ...otherDetails }, isAdmin, token: token });
+        } else {
+          return next(new ApiError("You aren't approved yet", 400));
+        }
+      }else{
+        return next(new ApiError("You Should verify your account", 300));
+      }
     }
-    const isPasswordCorrect = await bcrypt.compare(
-      req.body.password,
-      user.password
-    );
-    if (!isPasswordCorrect) {
-      return next(new ApiError("password isn't correct", 422));
-    }
-    if (user.approve) {
-      const token = JsonWebToken.sign(
-        { id: user._id, isAdmin: user.isAdmin },
-        process.env.JWT
-      );
-      const { password, isAdmin, ...otherDetails } = user._doc;
-      logger.info("User LogIn");
-      res
-        .cookie("accessToken", token, {
-          httpOnly: true, sameSite: 'lax'
-        })
-        .status(200)
-        .json({ details: { ...otherDetails }, isAdmin, token: token });
-    } else {
-      return next(new ApiError("You aren't approved yet", 400));
-    }
+    
   } catch (error) {
     logger.error("There is error", error);
     return next(new ApiError(`System Error ${error}`, 404));
   }
 };
-
 // Middleware to check if the token is valid and to log out the user
 export const logout = async (req, res, next) => {
   try {
