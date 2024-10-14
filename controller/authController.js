@@ -203,17 +203,37 @@ export const logout = async (req, res, next) => {
 ///////////////////////////////////////////////////////////////
 export const forgetPassword = async (req, res, next) => {
   try {
-    const { phone, password } = req.body;
+    const {email} =  req.body; 
+    const otp = generateOTP();
+        await mailSender({
+          to: email,
+          subject: "Verification Email",
+          message: `<h1>Please confirm your OTP</h1>
+               <p>Here is your OTP code: ${otp}</p>`,
+        });
+    const user =  await User.findOne({ email: email });
+    if (user) {
+      await  User.findByIdAndUpdate(user.id, { otp: otp } , {new : true });
+    }
+  } catch (error) {
+    next(new ApiError("System Error", 404));
+  }
+};
+
+export const changePassword =  async (req, res, next) => {
+  try {
+    const { email ,password } = req.body;
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-    const userAccount = await User.findOne({ phone: phone });
+    const userAccount = await User.findOne({ email: email });
     const newDateforUser = await User.findByIdAndUpdate(userAccount.id, {
       password: hashedPassword,
     });
     res
       .status(200)
       .json({ Message: "Your Passwprd is Updated", UserData: newDateforUser });
-  } catch (error) {
-    next(new ApiError("System Error", 404));
+
+  }catch(error){
+    return next(new ApiError("System Error", 404));
   }
-};
+}
