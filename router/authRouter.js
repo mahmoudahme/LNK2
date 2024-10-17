@@ -3,9 +3,8 @@ import {
     register ,
     login ,
     logout,
-    sendOTP,
     verifyOTP,
-    forgetPassword,
+    forgetPassword ,
     changePassword
 } 
 from "../controller/authController.js";
@@ -13,11 +12,11 @@ from "../controller/authController.js";
 import { verifyToken } from "../Utils/verifyToken.js";
 
 const router = express.Router();
-router.post('/changePassword', changePassword);
 router.post('/verifyOTP', verifyOTP);
 router.post("/register", register)
 router.post("/login" , login)
 router.post("/logout",logout);
 router.put("/forgetPass" , forgetPassword)
+router.put("/changePassword" ,  changePassword)
 
 export default router
