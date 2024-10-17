@@ -5,6 +5,10 @@ const userSchema = new mongoose.Schema(
       type : String ,
       required  :true
     },
+    isAdmin : {
+      type : Boolean ,
+      default :  false
+    },
     name: {
       type: String,
       required: true,
@@ -31,10 +35,6 @@ const userSchema = new mongoose.Schema(
     place :{
       type: Array 
     },
-    approve : {
-      type : Boolean ,
-      default : false 
-    } ,
     activation : {
       type : Boolean ,
       default : false 
@@ -50,7 +50,7 @@ const userSchema = new mongoose.Schema(
     UserId : {
       type :mongoose.Schema.Types.ObjectId ,
       ref : "User"
-    },
+    } ,
     otp : {
       type : Number ,
     } ,
