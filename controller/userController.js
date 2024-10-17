@@ -3,6 +3,7 @@ import { verifyToken } from "../Utils/verifyToken.js";
 import { incrementView } from "../middleware/View.js";
 import { shuffleArray } from "../middleware/shuffleArray.js";
 import { sort } from "../middleware/sorting.js";
+import bcrypt from "bcrypt"
 import commercialRent from "../model/Rent/commercialRent.js";
 import costalRent from "../model/Rent/costalRent.js";
 import residentialRent from "../model/Rent/residentialRent.js";
@@ -15,13 +16,20 @@ import commercialRequest from "../model/Sale Request/commercialRequest.js";
 import residentialRequestRent from "../model/Rent Request/residentialRequestRent.js";
 import costalRequestRent from "../model/Rent Request/costalRequestRent.js";
 import commercialRequestRent from "../model/Rent Request/commercialRequestRent.js";
-
 import User from "../model/User/User.js";
 ////////////////////////////////GET ALL USERS /////////////////////////////////////////////////
 export const getAllUsers = async (req, res, next) => {
   try {
-    const Users = await User.find();
-    res.status(200).json({ Data: Users });
+    verifyToken(req, res, async () => {
+      if (req.user.isAdmin) {
+        const Users = await User.find();
+        res.status(200).json({ Data: Users });
+      } else {
+        return next(
+          new ApiError("You are not authorized to perform this action", 403)
+        );
+      }
+    });
   } catch (error) {
     return next(new ApiError(`System Error ${error}`), 404);
   }
@@ -48,9 +56,19 @@ export const getUserById = async (req, res, next) => {
 ////////////////////////////////DELETE USER ///////////////////////////////////////////////////
 export const deleteUser = async (req, res, next) => {
   try {
-    const userID = req.params.id;
-    await User.findByIdAndDelete(userID);
-    res.status(200).json({ message: "This user is deleted " });
+    verifyToken(req, res, async () => {
+      const userID = req.user.id;
+      const user = await User.findById(userID);
+      if (req.user.isAdmin || user.typeofUser == "agency") {
+        const userID = req.params.id;
+        await User.findByIdAndDelete(userID);
+        res.status(200).json({ message: "This user is deleted " });
+      } else {
+        return next(
+          new ApiError("You are not authorized to perform this action", 403)
+        );
+      }
+    });
   } catch (error) {
     return next(new ApiError(`System Error ${error}`), 404);
   }
@@ -58,13 +76,35 @@ export const deleteUser = async (req, res, next) => {
 ////////////////////////////////UPDATA USER ///////////////////////////////////////////////////
 export const updateUser = async (req, res, next) => {
   try {
-    const userID = req.params.id;
-    const newDataOfUser = await User.findByIdAndUpdate(
-      userID,
-      { $set: req.body },
-      { new: true }
-    );
-    res.status(200).json({ user: newDataOfUser });
+    verifyToken(req, res, async () => {
+      const userID = req.params.id;
+      if (req.user.id === userID || req.user.isAdmin) {
+        if (req.body.password) {
+          const salt = await bcrypt.genSalt(10);
+          const hashedPassword = await bcrypt.hash(req.body.password, salt);
+          const newDateforUser = await User.findByIdAndUpdate(userID, {
+            password: hashedPassword,
+          });
+          res
+            .status(200)
+            .json({
+              Message: "Your Passwprd is Updated",
+              UserData: newDateforUser,
+            });
+        } else {
+          const newDataOfUser = await User.findByIdAndUpdate(
+            userID,
+            { $set: req.body },
+            { new: true }
+          );
+          res.status(200).json({ user: newDataOfUser });
+        }
+      } else {
+        return next(
+          new ApiError("You are not authorized to perform this action", 403)
+        );
+      }
+    });
   } catch (error) {
     return next(new ApiError(`System Error ${error}`), 404);
   }
@@ -363,30 +403,44 @@ export const addCredits = async (req, res, next) => {
   try {
     verifyToken(req, res, async () => {
       if (req.user) {
-        const id =  req.params.id;
+        const id = req.params.id;
         const userId = req.user.id;
         const agency = await User.findById(userId);
         const subAccount = await User.findById(id);
-        if(agency.typeofUser == "agency"){
-          if(subAccount.UserId ==  userId){
-            const {Credits} = req.body ;
-            if(agency.credits >  Credits){
-              await  User.findByIdAndUpdate(userId, {credits: agency.credits - Credits}, {new: true});
-              await  User.findByIdAndUpdate(id, {credits: subAccount.credits + Credits}, {new: true});
-              res.status(200).json({message: "Credits added successfully!"});
-            }else{
-            return next(new ApiError(`you don't have alot of Credits Upgrade your Account `, 404));
+        if (agency.typeofUser == "agency") {
+          if (subAccount.UserId == userId) {
+            const { Credits } = req.body;
+            if (agency.credits > Credits) {
+              await User.findByIdAndUpdate(
+                userId,
+                { credits: agency.credits - Credits },
+                { new: true }
+              );
+              await User.findByIdAndUpdate(
+                id,
+                { credits: subAccount.credits + Credits },
+                { new: true }
+              );
+              res.status(200).json({ message: "Credits added successfully!" });
+            } else {
+              return next(
+                new ApiError(
+                  `you don't have alot of Credits Upgrade your Account `,
+                  404
+                )
+              );
             }
-          }else{
-            return next(new ApiError(`You are not the owner of this account `, 404));
+          } else {
+            return next(
+              new ApiError(`You are not the owner of this account `, 404)
+            );
           }
-        }else{
+        } else {
           return next(new ApiError(`You are not an agency! `, 404));
         }
-      }else{
+      } else {
         return next(new ApiError(`You are not authenticated! `, 404));
       }
-      
     });
   } catch (error) {
     return next(new ApiError(`System Error ${error}`), 404);
